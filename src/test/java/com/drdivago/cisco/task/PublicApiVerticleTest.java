@@ -70,7 +70,7 @@ public class PublicApiVerticleTest {
 
     CompositeFuture.all(f1, f2).onComplete(testContext.succeeding(id -> {
       LanternLocation lanternLocation = new LanternLocation(new GreenLantern("Ganthet"), 10);
-      vertx.eventBus().request(CacheVerticle.PUT_ADDRESS, JsonObject.mapFrom(lanternLocation));
+      vertx.eventBus().request(CacheVerticle.PUT_ADDRESS_CURRENT, JsonObject.mapFrom(lanternLocation));
         webClient
           .get(8080, "localhost", "/locator/v1/location/current/single/Ganthet")
           .as(BodyCodec.string())
@@ -98,7 +98,7 @@ public class PublicApiVerticleTest {
     CompositeFuture.all(f1, f2).onComplete(testContext.succeeding(id -> {
 
       LanternLocation lanternLocation = new LanternLocation(new GreenLantern("Ganthet"), 10);
-      vertx.eventBus().request(CacheVerticle.PUT_ADDRESS, JsonObject.mapFrom(lanternLocation));
+      vertx.eventBus().request(CacheVerticle.PUT_ADDRESS_CURRENT, JsonObject.mapFrom(lanternLocation));
 
       webClient
         .get(8080, "localhost", "/locator/v1/location/current/single/test")
