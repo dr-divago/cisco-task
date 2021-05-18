@@ -4,6 +4,7 @@ import com.drdivago.cisco.task.common.GreenLanternList;
 import com.drdivago.cisco.task.common.LanternLocation;
 import com.drdivago.cisco.task.common.GreenLantern;
 import com.drdivago.cisco.task.service.AsyncCacheService;
+import com.drdivago.cisco.task.service.AsyncCacheService.CACHE_TYPE;
 import com.drdivago.cisco.task.service.MessageRouterService;
 import com.drdivago.cisco.task.writer.MessageWriter;
 import io.reactivex.Completable;
@@ -32,14 +33,9 @@ public class PublicApiVerticle extends AbstractVerticle {
   private static final Logger logger = LoggerFactory.getLogger(PublicApiVerticle.class);
 
   private static final String ASSIGNED_LOCATION_ENDPOINT = "/locator/v1/location/assigned/single/:greenLanternName";
-
   private static final String ASSIGNED_LOCATION_BATCH_ENDPOINT = "/locator/v1/location/assigned/batch/:greenLanternName";
-
-  private static final String CURRENT_LOCATION_ENDPOINT =
-      "/locator/v1/location/current/single/:greenLanternName";
-
-  private static final String CURRENT_LOCATION_BATCH_ENDPOINT =
-      "/locator/v1/location/current/batch/:greenLanternName";
+  private static final String CURRENT_LOCATION_ENDPOINT = "/locator/v1/location/current/single/:greenLanternName";
+  private static final String CURRENT_LOCATION_BATCH_ENDPOINT = "/locator/v1/location/current/batch/:greenLanternName";
 
   private AsyncCacheService<LanternLocation> asyncCacheService;
   private MessageRouterService messageRouterService;
@@ -68,37 +64,38 @@ public class PublicApiVerticle extends AbstractVerticle {
   }
 
   private void getAssignedLocation(RoutingContext ctx) {
-    Function<JsonArray, Single<Message<JsonObject>>> f = messageRouterService::askForAssignedLocation;
-    askForSingleLocation(ctx, f);
+    Function<JsonArray, Single<Message<JsonObject>>> route = messageRouterService::askForAssignedLocation;
+    askForSingleLocation(ctx, route, CACHE_TYPE.ASSIGNED_LOCATION_CACHE);
   }
 
   private void getAssignedBatchLocation(RoutingContext ctx) {
-    Function<JsonArray, Single<Message<JsonArray>>> f = messageRouterService::askForAssignedLocationBatch;
-    askForBatch(ctx, f);
+    Function<JsonArray, Single<Message<JsonArray>>> route = messageRouterService::askForAssignedLocationBatch;
+    askForBatch(ctx, route, CACHE_TYPE.ASSIGNED_LOCATION_CACHE);
   }
 
   private void getCurrentLocation(RoutingContext ctx) {
     Function<JsonArray, Single<Message<JsonObject>>> f = messageRouterService::askForCurrentLocation;
-    askForSingleLocation(ctx, f);
+    askForSingleLocation(ctx, f, CACHE_TYPE.CURRENT_LOCATION_CACHE);
   }
 
   private void getCurrentLocationBatch(RoutingContext ctx) {
     Function<JsonArray, Single<Message<JsonArray>>> f = messageRouterService::askForCurrentLocationBatch;
-    askForBatch(ctx, f);
+    askForBatch(ctx, f, CACHE_TYPE.CURRENT_LOCATION_CACHE);
   }
 
-  private void askForSingleLocation(RoutingContext ctx, Function<JsonArray, Single<Message<JsonObject>>> f) {
+  private void askForSingleLocation(RoutingContext ctx, Function<JsonArray, Single<Message<JsonObject>>> route, CACHE_TYPE cacheType) {
     String greenLanternName = ctx.pathParam("greenLanternName");
     var writer = new MessageWriter(ctx);
     validateRequest(Arrays.asList(greenLanternName).toArray(new String[1]), writer);
 
     JsonArray message = new JsonArray().add(0, greenLanternName);
-    asyncCacheService.tryRecoverFromCache(greenLanternName).subscribe(
-      lanternLocation -> {
-        lanternLocation
-          .stream()
-          .forEach( value -> writer.okResponse("Sector " + value.getLocation()));
-        handleResponseJsonObject(f.apply(message), writer);
+    asyncCacheService
+      .tryRecoverFromCache(greenLanternName, cacheType)
+      .subscribe(lanternLocation -> {
+          lanternLocation
+            .stream()
+            .forEach( value -> writer.okResponse("Sector " + value.getLocation()));
+        handleResponseJsonObject(route.apply(message), writer);
       },
       err -> {
         logger.error("CacheVerticle down or timeout");
@@ -107,7 +104,7 @@ public class PublicApiVerticle extends AbstractVerticle {
     );
   }
 
-  private void askForBatch(RoutingContext ctx, Function<JsonArray, Single<Message<JsonArray>>> f) {
+  private void askForBatch(RoutingContext ctx, Function<JsonArray, Single<Message<JsonArray>>> f, CACHE_TYPE cacheType) {
     var writer = new MessageWriter(ctx);
     String greenLanternNameList = ctx.pathParam("greenLanternName");
     String[] list = greenLanternNameList.split(",");
@@ -117,14 +114,14 @@ public class PublicApiVerticle extends AbstractVerticle {
     var message = new JsonArray();
     Stream.of(list).forEach(message::add);
 
-    Single.zip(asyncCacheService.tryRecoverFromCache(list), this::mergeResult).subscribe(
+    Single.zip(asyncCacheService.tryRecoverFromCache(list, cacheType), this::mergeResult).subscribe(
       ok -> {
         if (ok.size() == list.length ) //recovered all values from cache
           writer.okResponse(ok);
         handleResponse(f.apply(message), writer); //try to connect to server to recover latest position
       },
       err -> {
-        logger.info("Error {}", err);
+        logger.error("Error {}", err);
         handleResponse(f.apply(message), writer);
       });
   }
@@ -157,7 +154,7 @@ public class PublicApiVerticle extends AbstractVerticle {
         .subscribeOn(RxHelper.scheduler(vertx))
         .timeout(1, TimeUnit.SECONDS, RxHelper.scheduler(vertx))
         .subscribe(
-            response -> writer.okResponse(response.encode()),
+            response -> writer.okResponse("Sector " + response.getInteger("location")),
             error -> manageError(error, writer)
         );
   }

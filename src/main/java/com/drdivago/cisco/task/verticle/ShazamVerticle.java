@@ -1,7 +1,8 @@
 package com.drdivago.cisco.task.verticle;
 
 import com.drdivago.cisco.task.common.LanternLocation;
-import com.drdivago.cisco.task.model.ErrorCode;
+import com.drdivago.cisco.task.common.ErrorCode;
+import com.drdivago.cisco.task.service.AsyncCacheService.CACHE_TYPE;
 import com.drdivago.cisco.task.service.ConnectionService;
 import com.drdivago.cisco.task.service.MessageRouterService;
 import com.drdivago.cisco.task.service.Request;
@@ -82,7 +83,7 @@ public class ShazamVerticle extends BaseVerticle {
         .subscribe(
           okResponse -> okResponse.ifPresentOrElse(greenLantern -> {
               logger.info("ShazamService response {}, caching result", greenLantern.toJson());
-              asyncCacheService.cacheResult(greenLantern.getLantern().getName(), greenLantern);
+              asyncCacheService.cacheResult(greenLantern.getLantern().getName(), greenLantern, CACHE_TYPE.CURRENT_LOCATION_CACHE);
               result.add(greenLantern.toJson());
             },
             () -> {
@@ -120,7 +121,7 @@ public class ShazamVerticle extends BaseVerticle {
   private void manageOk(Optional<LanternLocation> okResponse, Message<JsonArray> message) {
     okResponse.ifPresentOrElse( greenLantern -> {
         logger.info("ShazamService response {}, caching result and reply", greenLantern.toJson());
-        asyncCacheService.cacheResult(greenLantern.getLantern().getName(), greenLantern);
+        asyncCacheService.cacheResult(greenLantern.getLantern().getName(), greenLantern, CACHE_TYPE.CURRENT_LOCATION_CACHE);
         message.reply(greenLantern.toJson());
       },
       () -> message.fail(ErrorCode.WRONG_RESPONSE.getCode(), ErrorCode.WRONG_RESPONSE.getMessage())

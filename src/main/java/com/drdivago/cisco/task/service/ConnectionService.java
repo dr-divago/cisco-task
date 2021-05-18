@@ -2,7 +2,7 @@ package com.drdivago.cisco.task.service;
 
 import com.drdivago.cisco.task.common.GreenLantern;
 import com.drdivago.cisco.task.common.LanternLocation;
-import com.drdivago.cisco.task.validator.Validable;
+import com.drdivago.cisco.task.validator.Validate;
 import io.reactivex.Single;
 import io.vertx.core.Promise;
 import io.vertx.reactivex.circuitbreaker.CircuitBreaker;
@@ -24,7 +24,7 @@ public class ConnectionService {
   protected WebClient webClient;
   private boolean withCircuitBreaker;
   private CircuitBreaker circuitBreaker;
-  private Validable validator;
+  private Validate validator;
 
 
   private Function<HttpResponse<Void>, ResponsePredicateResult> statusCodeValidator =
@@ -45,12 +45,10 @@ public class ConnectionService {
     return this;
   }
 
-  public ConnectionService withValidator(Validable validator) {
+  public ConnectionService withValidator(Validate validator) {
     this.validator = validator;
     return this;
   }
-
-
 
   public Single<HttpResponse<Optional<LanternLocation>>> build(Request request) {
     return webClient

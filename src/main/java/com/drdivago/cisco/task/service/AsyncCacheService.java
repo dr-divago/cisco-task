@@ -18,6 +18,18 @@ public class AsyncCacheService<T> implements AsyncCacheable<String, T> {
   private final Vertx vertx;
   private final Class<T> classType;
 
+  public enum CACHE_TYPE {
+    ASSIGNED_LOCATION_CACHE(CacheVerticle.GET_ADDRESS_ASSIGNED, CacheVerticle.PUT_ADDRESS_ASSIGNED),
+    CURRENT_LOCATION_CACHE(CacheVerticle.GET_ADDRESS_CURRENT, CacheVerticle.PUT_ADDRESS_CURRENT);
+
+    private String get;
+    private String put;
+    CACHE_TYPE(String getAddressAssigned, String putAddressAssigned) {
+      this.get = getAddressAssigned;
+      this.put = putAddressAssigned;
+    }
+  }
+
   public AsyncCacheService(Vertx vertx, Class<T> classType) {
     this.vertx = vertx;
     this.classType = classType;
@@ -25,19 +37,19 @@ public class AsyncCacheService<T> implements AsyncCacheable<String, T> {
   }
 
   @Override
-  public Single<Message<JsonArray>> get(String key) {
-    return vertx.eventBus().rxRequest(CacheVerticle.GET_ADDRESS, key);
+  public Single<Message<JsonArray>> get(String key, CACHE_TYPE cache_type) {
+    return vertx.eventBus().rxRequest(cache_type.get, key);
   }
 
   @Override
-  public void cacheResult(String key, T value) {
-    vertx.eventBus().request(CacheVerticle.PUT_ADDRESS, JsonObject.mapFrom(value));
+  public void cacheResult(String key, T value, CACHE_TYPE cache_type) {
+    vertx.eventBus().request(cache_type.put, JsonObject.mapFrom(value));
   }
 
-  public Single<Optional<T>> tryRecoverFromCache(String key) {
+  public Single<Optional<T>> tryRecoverFromCache(String key, CACHE_TYPE cacheType) {
     logger.info("Trying to recover location from cache...");
 
-    Single<Message<JsonArray>> cacheResponse = get(key);
+    Single<Message<JsonArray>> cacheResponse = get(key, cacheType);
     return cacheResponse.map( x -> {
       var object = x.body().getJsonObject(0);
       var result = object.getString("result");
@@ -50,13 +62,13 @@ public class AsyncCacheService<T> implements AsyncCacheable<String, T> {
     });
   }
 
-  public List<Single<Optional<T>>> tryRecoverFromCache(String[] keys) {
+  public List<Single<Optional<T>>> tryRecoverFromCache(String[] keys, CACHE_TYPE cacheType) {
     logger.info("Error connecting to external service! Trying to recover location from cache...");
 
     List<Single<Optional<T>>> lists = new ArrayList<>();
 
     for (var i = 0; i < keys.length; i++) {
-      Single<Message<JsonArray>> cacheResponse = get(keys[i]);
+      Single<Message<JsonArray>> cacheResponse = get(keys[i], cacheType);
       lists.add(cacheResponse.map( x -> {
         var object = x.body().getJsonObject(0);
         var result = object.getString("result");

@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 
-public class ShazamValidator implements Validable {
+public class ShazamValidator implements Validate {
 
   private static final Logger logger = LoggerFactory.getLogger(ShazamValidator.class);
 

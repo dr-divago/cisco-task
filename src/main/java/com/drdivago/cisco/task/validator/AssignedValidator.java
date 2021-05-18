@@ -4,7 +4,7 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class AssignedValidator  implements Validable{
+public class AssignedValidator  implements Validate {
 
   private static final Logger logger = LoggerFactory.getLogger(AssignedValidator.class);
   @Override

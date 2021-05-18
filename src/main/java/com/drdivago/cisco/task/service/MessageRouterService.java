@@ -32,6 +32,6 @@ public class MessageRouterService {
   }
 
   public Single<Message<JsonArray>> askForAssignedLocationBatch(JsonArray message) {
-    return vertx.eventBus().rxRequest(SHAZAM_CURRENT_LOCATION_BATCH, message);
+    return vertx.eventBus().rxRequest(SHAZAM_ASSIGNED_LOCATION_BATCH, message);
   }
 }

@@ -9,33 +9,63 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.reactivex.core.eventbus.Message;
+import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class CacheVerticle extends AbstractVerticle {
 
   private static final Logger logger = LoggerFactory.getLogger(CacheVerticle.class);
-  public static final String PUT_ADDRESS = "cache.put";
-  public static final String GET_ADDRESS = "cache.get";
+  public static final String PUT_ADDRESS_ASSIGNED = "cache.assigned.put";
+  public static final String GET_ADDRESS_ASSIGNED = "cache.assigned.get";
 
-  private Cache<String, Integer> sectorCache;
+  public static final String PUT_ADDRESS_CURRENT = "cache.current.put";
+  public static final String GET_ADDRESS_CURRENT = "cache.current.get";
+
+  private Cache<String, Integer> currentSectorCache;
+  private Cache<String, Integer> assignedSectorCache;
 
   @Override
   public Completable rxStart() {
 
-    sectorCache = Caffeine
+    assignedSectorCache = Caffeine
         .newBuilder()
         .maximumSize(10_000)
+        .expireAfterWrite(Duration.ofMinutes(1))
         .build();
 
-    vertx.eventBus().consumer(PUT_ADDRESS, this::putLocation);
-    vertx.eventBus().consumer(GET_ADDRESS, this::getLocation);
+    currentSectorCache = Caffeine
+      .newBuilder()
+      .maximumSize(10_000)
+      .expireAfterWrite(Duration.ofMinutes(1))
+      .build();
+
+    vertx.eventBus().consumer(PUT_ADDRESS_ASSIGNED, this::putLocationAssigned);
+    vertx.eventBus().consumer(GET_ADDRESS_ASSIGNED, this::getLocationAssigned);
+    vertx.eventBus().consumer(PUT_ADDRESS_CURRENT, this::putLocationCurrent);
+    vertx.eventBus().consumer(GET_ADDRESS_CURRENT, this::getLocationCurrent);
 
     return Completable.complete();
   }
 
-  private void getLocation(Message<String> message) {
-    Integer sector = sectorCache.getIfPresent(message.body());
+  private void putLocationCurrent(Message<JsonObject> message) {
+    put(message, currentSectorCache);
+  }
+
+  private void getLocationCurrent(Message<String> message) {
+    get(message, currentSectorCache);
+  }
+
+  private void getLocationAssigned(Message<String> message) {
+    get(message, assignedSectorCache);
+  }
+
+  private void putLocationAssigned(Message<JsonObject> message) {
+    put(message, assignedSectorCache);
+  }
+
+  private void get(Message<String> message, Cache<String, Integer> cache ) {
+    Integer sector = cache.getIfPresent(message.body());
 
     if (sector == null) {
       logger.info("Cache miss, no cached location for greenLantern {}", message.body());
@@ -52,8 +82,8 @@ public class CacheVerticle extends AbstractVerticle {
     }
   }
 
-  private void putLocation(Message<JsonObject> message) {
+  private void put(Message<JsonObject> message, Cache<String, Integer> cache) {
     var greenLantern = message.body().mapTo(LanternLocation.class);
-    sectorCache.put(greenLantern.getLantern().getName(), greenLantern.getLocation());
+    cache.put(greenLantern.getLantern().getName(), greenLantern.getLocation());
   }
 }

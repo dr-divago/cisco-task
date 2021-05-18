@@ -1,4 +1,4 @@
-package com.drdivago.cisco.task.model;
+package com.drdivago.cisco.task.common;
 
 public enum ErrorCode {
   WRONG_RESPONSE(100, "Wrong response from the server"),
